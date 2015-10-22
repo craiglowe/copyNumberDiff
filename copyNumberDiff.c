@@ -1,6 +1,7 @@
 /*
 
 copyNumberDiff.c
+Written by Craig Lowe
 
 */
 
@@ -34,7 +35,6 @@ static struct optionSpec optionSpecs[] =
 char *optChrom = NULL;
 char *optRoi = NULL;
 int optMinQual = 0;
-int optMaxReadDepth = 300;
 boolean optLogProbs = FALSE;
 boolean optDebugStats = FALSE;
 
@@ -52,7 +52,6 @@ errAbort(
 	"   -minQual         (0)        Mapping quality must be at least this\n"
 	"   -chrom           (NULL)     Restrict both chrom info and bams to only this chromosome\n"
 	"   -logProbs        (false)    Do some of the calculations and report the emission probs as log(probs)\n"
-	"   -maxReadDepth    (300)      Cap the read depth at X times the expected depth\n"
 	"   -debugStats      (false)    Give output for debugging different distributions\n"
 	);
 }
@@ -271,7 +270,7 @@ void setGcDataFromWig(char *wigFilename, struct hash *baseDataHash, double *gcBi
 
 void probOfDepthBasicBinom(unsigned int depth, unsigned int copyNumber, double totalReads, double *retProb, double *retDensity)
 {
-        double prob = 0;
+	double prob = 0;
 
 	prob = copyNumber / 2.0 / 446627861.0 * 0.91 + 0.09 * 1.0 / 446627861.0;
 	*retProb = prob;
@@ -281,9 +280,9 @@ void probOfDepthBasicBinom(unsigned int depth, unsigned int copyNumber, double t
 
 void probOfDepthBasicNegBinom(unsigned int depth, unsigned int copyNumber, double totalReads, double *retMean, double *retSize, double *retDensity)
 {
-        double prob = 0, mean = 0, var = 0;
+	double prob = 0, mean = 0, var = 0;
 
-        prob = copyNumber / 2.0 / 446627861.0 * 0.91 + 0.09 * 1.0 / 446627861.0;
+	prob = copyNumber / 2.0 / 446627861.0 * 0.91 + 0.09 * 1.0 / 446627861.0;
 	mean = prob * totalReads * 36.0;
 	if(copyNumber == 0){var = 0.788975469945228;}
 	else if(copyNumber == 1){var = 1.95722512845021;}
@@ -299,19 +298,19 @@ void probOfDepthBasicNegBinom(unsigned int depth, unsigned int copyNumber, doubl
 
 void probOfDepthBasicDynamic(unsigned int depth, unsigned int copyNumber, double totalReads, unsigned int totalKmers, unsigned int kmerLength, unsigned int *kmerMismaps, struct bed *noGapBed, unsigned int basePos, double *retProb, double *retDensity)
 {
-        unsigned int i = 0, start = 0;
-        double prob = 0, numer = 0, denom = 0, correctedMisMaps = 0;
+	unsigned int i = 0, start = 0;
+	double prob = 0, numer = 0, denom = 0, correctedMisMaps = 0;
 
-        if(noGapBed->chromStart + kmerLength > basePos){start = noGapBed->chromStart;}
-        else{start = 1 + basePos - kmerLength;}
+	if(noGapBed->chromStart + kmerLength > basePos){start = noGapBed->chromStart;}
+	else{start = 1 + basePos - kmerLength;}
 
-        for(i=start; i<=basePos; i++)
-        {
-                correctedMisMaps = (double)kmerMismaps[i] + 0.01 * ((double)kmerMismaps[i] + 1.0);
-                numer = (double)copyNumber + correctedMisMaps * 2.0;
-                denom = (double)totalKmers * 2.0 * (correctedMisMaps + 1.0);
-                prob += numer / denom;
-        }
+	for(i=start; i<=basePos; i++)
+	{
+		correctedMisMaps = (double)kmerMismaps[i] + 0.01 * ((double)kmerMismaps[i] + 1.0);
+		numer = (double)copyNumber + correctedMisMaps * 2.0;
+		denom = (double)totalKmers * 2.0 * (correctedMisMaps + 1.0);
+		prob += numer / denom;
+	}
 	*retProb = prob;
 	*retDensity = binomPdfApproxPoisson(depth, prob, totalReads);
 }
@@ -354,29 +353,6 @@ int maxUnsignedInt(unsigned int a, unsigned int b)
 	else{return(b);}
 }
 
-/*
-void probMemoFillInProbs(unsigned int numSamples, unsigned int *maxDepth, double *totalCoverage, double genomeSize, double misMapRate, struct probMemo *pm)
-{
-	unsigned int last=0, depth=0, sample=0, copyNumber=0;
-	double prob=0;
-	//double binomProb=0;
-	for(sample=0; sample<numSamples; sample++)
-	{
-		for(depth=0; depth<maxDepth[sample]+1; depth++)
-		{
-			last = pm->maxCopyNumberPresent[sample][depth]+1;
-			AllocArray(pm->prob[sample][depth], last);
-			for(copyNumber=0; copyNumber < last; copyNumber++)
-			{
-				//binomProb = lookUpBinom(binomMemo, copyNumber, genomeSize);
-				//prob = binomPdfApproxPoisson(depth, binomProb, totalCoverage[sample]);
-				prob = probOfDepth(depth, copyNumber, genomeSize, totalCoverage[sample], misMapRate);
-				pm->prob[sample][depth][copyNumber] = prob;
-			}
-		}
-	}
-}
-*/
 
 struct hash *initDataStructure(struct slChrom *chromList, unsigned int numberOfSamples)
 {
@@ -552,36 +528,6 @@ void calcEmissionProbs(unsigned int numSamplesOne, unsigned int numSamplesTwo, d
 }
 
 
-// right now I do not update total coverage when I cap the possible read depth.  I am not sure which way is better
-/*
-unsigned int *fillInMaxDepth(unsigned int numSamples, struct slChrom *chromList, struct hash *coverageHash, double *totalCoverage, double genomeSize)
-{
-	unsigned int *maxDepth = NULL;
-	struct slChrom *currChrom = NULL;
-	unsigned int  **depth = NULL;
-	unsigned int basePos = 0, sample = 0;
-	double cutoff = 0;
-
-	AllocArray(maxDepth, numSamples);
-
-	for(currChrom=chromList; currChrom != NULL; currChrom=currChrom->next)
-	{
-		verbose(3, " Currently looking at %s\n", currChrom->name);
-		depth = hashMustFindVal(coverageHash, currChrom->name);
-		for(sample=0; sample<numSamples; sample++)
-		{
-			cutoff = optMaxReadDepth * totalCoverage[sample] / genomeSize;
-			for(basePos=0; basePos < currChrom->length; basePos++)
-			{
-				if(depth[sample][basePos] > cutoff){depth[sample][basePos] = (unsigned int)cutoff;}
-				if(depth[sample][basePos] > maxDepth[sample]){maxDepth[sample] = depth[sample][basePos];}
-			}
-		}
-	}
-	return(maxDepth);
-}
-*/
-
 void getKey(unsigned int numSamples, unsigned int **coverage, unsigned int basePos, char *retKey)
 {
 	unsigned int buffLen = 0, sample = 0;
@@ -609,61 +555,61 @@ struct bed *findNoGapRegion(struct hash *noGapHash, struct bed *roi)
 
 void printIntermediateData(unsigned int numSamplesOne, unsigned int numSamplesTwo, unsigned int maxCopy, struct hash *noGapHash, struct hash *roiHash, struct hash *coverageHash, double *totalReads, unsigned int totalKmerCount, unsigned int kmerLength, struct hash *kmerMisMapsHash, struct hash *gcContentHash, double **gcCorrection, char *outFilename)
 {
-        unsigned int basePos = 0;
-        unsigned int **coverage = NULL;
-        double probBinom = 0, densityBinom = 0, meanNegBinom = 0, sizeNegBinom = 0, densityNegBinom = 0, probDynamicBinom = 0, densityDynamicBinom = 0;
-        unsigned int numSamples = 0, sampleNumber = 0, copyNumber = 0;
-        unsigned int *kmerMisMaps = NULL, *gcData = NULL;
+	unsigned int basePos = 0;
+	unsigned int **coverage = NULL;
+	double probBinom = 0, densityBinom = 0, meanNegBinom = 0, sizeNegBinom = 0, densityNegBinom = 0, probDynamicBinom = 0, densityDynamicBinom = 0;
+	unsigned int numSamples = 0, sampleNumber = 0, copyNumber = 0;
+	unsigned int *kmerMisMaps = NULL, *gcData = NULL;
 
-        verbose(3, " Allocating memory\n");
+	verbose(3, " Allocating memory\n");
 
-        numSamples = numSamplesOne + numSamplesTwo;
+	numSamples = numSamplesOne + numSamplesTwo;
 
-        FILE *fout = mustOpen(outFilename, "w");
+	FILE *fout = mustOpen(outFilename, "w");
 
-        struct hashCookie cookie = hashFirst(roiHash);
-        struct bed *headBed = NULL, *bunk = NULL, *noGapBed = NULL;
-        struct hashEl *hel = NULL;
+	struct hashCookie cookie = hashFirst(roiHash);
+	struct bed *headBed = NULL, *bunk = NULL, *noGapBed = NULL;
+	struct hashEl *hel = NULL;
 	double *logLikeOne = NULL, *logLikeTwo = NULL, *logLikeThree = NULL, *mseOne = NULL, *mseTwo = NULL, *mseThree = NULL;
 	AllocArray(logLikeOne, maxCopy + 1);
 	AllocArray(logLikeTwo, maxCopy + 1);
 	AllocArray(logLikeThree, maxCopy + 1);
 	AllocArray(mseOne, maxCopy + 1);
-        AllocArray(mseTwo, maxCopy + 1);
-        AllocArray(mseThree, maxCopy + 1);
+	AllocArray(mseTwo, maxCopy + 1);
+	AllocArray(mseThree, maxCopy + 1);
 	for(copyNumber=0;copyNumber<=maxCopy;copyNumber++)
 	{
 		logLikeOne[copyNumber] = 0;
 		logLikeTwo[copyNumber] = 0;
 		logLikeThree[copyNumber] = 0;
 		mseOne[copyNumber] = 0;
-                mseTwo[copyNumber] = 0;
-                mseThree[copyNumber] = 0;
+		mseTwo[copyNumber] = 0;
+		mseThree[copyNumber] = 0;
 	}
 
-        verbose(3, " Writing output...\n");
-        for(hel = hashNext(&cookie); hel != NULL; hel = hashNext(&cookie))
-        {
-                headBed = hel->val;
-                coverage = hashMustFindVal(coverageHash, headBed->chrom);
-                kmerMisMaps = hashMustFindVal(kmerMisMapsHash, headBed->chrom);
-                gcData = hashMustFindVal(gcContentHash, headBed->chrom);
-                for(bunk = headBed; bunk != NULL; bunk=bunk->next)
-                {
-                        verbose(3, " Working on %s:%u-%u\n", bunk->chrom, bunk->chromStart, bunk->chromEnd);
-                        fprintf(fout, "fixedStep chrom=%s start=%u step=1\n", bunk->chrom, bunk->chromStart + 1);
+	verbose(3, " Writing output...\n");
+	for(hel = hashNext(&cookie); hel != NULL; hel = hashNext(&cookie))
+	{
+		headBed = hel->val;
+		coverage = hashMustFindVal(coverageHash, headBed->chrom);
+		kmerMisMaps = hashMustFindVal(kmerMisMapsHash, headBed->chrom);
+		gcData = hashMustFindVal(gcContentHash, headBed->chrom);
+		for(bunk = headBed; bunk != NULL; bunk=bunk->next)
+		{
+			verbose(3, " Working on %s:%u-%u\n", bunk->chrom, bunk->chromStart, bunk->chromEnd);
+			fprintf(fout, "fixedStep chrom=%s start=%u step=1\n", bunk->chrom, bunk->chromStart + 1);
 			noGapBed = findNoGapRegion(noGapHash, bunk);
 			for(copyNumber=0;copyNumber<=maxCopy;copyNumber++)
-		        {
-		                logLikeOne[copyNumber] = 0;
-		                logLikeTwo[copyNumber] = 0;
-		                logLikeThree[copyNumber] = 0;
-		                mseOne[copyNumber] = 0;
-		                mseTwo[copyNumber] = 0;
-		                mseThree[copyNumber] = 0;
-		        }
-                        for(basePos=bunk->chromStart; basePos < bunk->chromEnd; basePos++)
-                        {
+			{
+				logLikeOne[copyNumber] = 0;
+				logLikeTwo[copyNumber] = 0;
+				logLikeThree[copyNumber] = 0;
+				mseOne[copyNumber] = 0;
+				mseTwo[copyNumber] = 0;
+				mseThree[copyNumber] = 0;
+			}
+			for(basePos=bunk->chromStart; basePos < bunk->chromEnd; basePos++)
+			{
 				sampleNumber = 0;
 				fprintf(fout, "%s\t%u\t", bunk->chrom, basePos);
 				for(copyNumber = 0; copyNumber <= maxCopy; copyNumber+=1)
@@ -675,18 +621,18 @@ void printIntermediateData(unsigned int numSamplesOne, unsigned int numSamplesTw
 					logLikeOne[copyNumber] = multiplyLog(logLikeOne[copyNumber], log(densityBinom));
 					logLikeTwo[copyNumber] = multiplyLog(logLikeTwo[copyNumber], log(densityNegBinom));
 					logLikeThree[copyNumber] = multiplyLog(logLikeThree[copyNumber], log(densityDynamicBinom));
-                                	mseOne[copyNumber] += (1.0 - densityBinom) * (1.0 - densityBinom);
+					mseOne[copyNumber] += (1.0 - densityBinom) * (1.0 - densityBinom);
 					mseTwo[copyNumber] += (1.0 - densityNegBinom) * (1.0 - densityNegBinom);
 					mseThree[copyNumber] += (1.0 - densityDynamicBinom) * (1.0 - densityDynamicBinom);
 				}
-                                fprintf(fout, "%u\n", coverage[sampleNumber][basePos]);
-                        }
+				fprintf(fout, "%u\n", coverage[sampleNumber][basePos]);
+			}
 			fprintf(fout, "summaryBinom\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", mseOne[0], logLikeOne[0], mseOne[1], logLikeOne[1], mseOne[2], logLikeOne[2], mseOne[3], logLikeOne[3], mseOne[4], logLikeOne[4]);
 			fprintf(fout, "summaryNegBinom\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", mseTwo[0], logLikeTwo[0], mseTwo[1], logLikeTwo[1], mseTwo[2], logLikeTwo[2], mseTwo[3], logLikeTwo[3], mseTwo[4], logLikeTwo[4]);
 			fprintf(fout, "summaryDynamicBinom\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\t%e\n", mseThree[0], logLikeThree[0], mseThree[1], logLikeThree[1], mseThree[2], logLikeThree[2], mseThree[3], logLikeThree[3], mseThree[4], logLikeThree[4]);
-                }
-        }
-        carefulClose(&fout);
+		}
+	}
+	carefulClose(&fout);
 }
 
 
@@ -819,7 +765,7 @@ void copyNumberDiff(char *noGapFilename, char *misMapsWigFilename, char *gcConte
 
 	if(optDebugStats && optRoi)
 	{
-                printIntermediateData(numFilesOne, numFilesTwo, maxCopyNumber, noGapHash, roiHash, coverageHash, totalReads, totalKmerCount, kmerLength, kmerMisMapsHash, gcContentHash, gcCorrection, outFilename);
+		printIntermediateData(numFilesOne, numFilesTwo, maxCopyNumber, noGapHash, roiHash, coverageHash, totalReads, totalKmerCount, kmerLength, kmerMisMapsHash, gcContentHash, gcCorrection, outFilename);
 	}
 	else
 	{
@@ -835,14 +781,12 @@ void copyNumberDiff(char *noGapFilename, char *misMapsWigFilename, char *gcConte
 int main(int argc, char *argv[])
 {
 	optionInit(&argc, argv, optionSpecs);
-	if (argc != 7)
-		usage();
+	if (argc != 7){usage();}
 
 	optChrom = optionVal("chrom", optChrom);
 	optRoi = optionVal("roi", optRoi);
 	optMinQual = optionInt("minQual", optMinQual);
 	optLogProbs = optionExists("logProbs");
-	optMaxReadDepth = optionInt("maxReadDepth", optMaxReadDepth);
 	optDebugStats = optionExists("debugStats");
 
 	copyNumberDiff(argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);

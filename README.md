@@ -118,6 +118,15 @@ genome that are not assembly gaps.
 used by copyNumberDiff.
 </ol>
 
+<li> bamToGcStats is not needed for the workflow, but it can show you a summary
+of the GC content reads from a bam file.  This can give you the GC-bias of the library
+when compared against the stats you just calculated of the reference genome.
+<ol>
+<li> in.bam - the bam file to analyze.
+<li> readLength - sequencing read length of library in bam file.
+<li> out.stats - this is a text output file summarizing the sequencing library
+</ol>
+
 <li> copyNumberDiff will use the results of the two previous program, along with
 the bam files of each individual, to compute the emission probablilities of the transducer.
 <ol>

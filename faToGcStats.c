@@ -1,7 +1,7 @@
 /*
 
 faToGcStats.c
-Written by: Craig Lowe
+Written by Craig Lowe
 
 */
 
@@ -31,13 +31,13 @@ void usage()
 /* Explain usage and exit. */
 {
 errAbort(
-	 "faToGcStats - count the gc content of windows\n"
-	 "usage:\n"
-	 "   faToGcStats in.fa noGap.bed windowLength out.stats\n"
-	 "options:\n"
-	 "     -wiggle  (filename)  Output number of G/Cs in window starting at each base\n"
-	 "notes:\n"
-	 );
+	"faToGcStats - count the gc content of windows\n"
+	"usage:\n"
+	"   faToGcStats in.fa noGap.bed windowLength out.stats\n"
+	"options:\n"
+	"     -wiggle  (filename)  Output number of G/Cs in window starting at each base\n"
+	"notes:\n"
+	);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -77,7 +77,7 @@ unsigned int reportGcCount(char *seq, unsigned int windowLength)
 		else if(seq[i] == 'a' || seq[i] == 'A' || seq[i] == 't' || seq[i] == 'T'){}
 		else{errAbort("Error: ungapped regions should be only acgtACGT bases: %c\n", seq[i]);}
 	}
-        return(gcCount);
+	return(gcCount);
 }
 
 

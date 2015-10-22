@@ -1,7 +1,7 @@
 /*
 
 countKmers.c
-Written by: Craig Lowe (lowec@stanford.edu)
+Written by Craig Lowe
 
 */
 
@@ -18,7 +18,6 @@ Written by: Craig Lowe (lowec@stanford.edu)
 /*---------------------------------------------------------------------------*/
 
 static struct optionSpec optionSpecs[] =
-/* command line option specifications */
 {
 	{NULL, 0}
 };
@@ -29,12 +28,12 @@ void usage()
 /* Explain usage and exit. */
 {
 errAbort(
-	 "countKmers - count the number of times each k-mer appears\n"
-	 "usage:\n"
-	 "   countKmers kmerLength in.fa noGap.bed kmers.wig\n"
-	 "options:\n"
-	 "notes:\n"
-	 );
+	"countKmers - count the number of times each k-mer appears\n"
+	"usage:\n"
+	"   countKmers kmerLength in.fa noGap.bed kmers.wig\n"
+	"options:\n"
+	"notes:\n"
+	);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -82,10 +81,10 @@ void freeBloom(struct bloomFilter **pEl)
 {
 	struct bloomFilter *el = NULL;
 	el = *pEl;
-        if(el != NULL)
+	if(el != NULL)
 	{
 		freeMem(el->table);
-        	freez(pEl);
+		freez(pEl);
 	}
 }
 

@@ -1,6 +1,7 @@
 /*
 
 bamToGcStats.c
+Written by Craig Lowe
 
 */
 
@@ -124,8 +125,7 @@ void bamToGcStats(char *bamFilename, uint32_t readLength, char *outFilename)
 int main(int argc, char *argv[])
 {
 	optionInit(&argc, argv, optionSpecs);
-	if (argc != 4)
-		usage();
+	if (argc != 4){usage();}
 
 	optMinQual = optionInt("minQual", optMinQual);
 
