@@ -106,6 +106,37 @@ Doing this and piping it through gzip might be a good idea
 because the file will usually be large.
 </ol>
 
+<li> We will use the faToGcStats program to estimte how likely the coverage
+of a base is to be affected by GC-bias in the sequencing library.
+<ol>
+<li> in.fa - this is the reference genome in fasta format
+<li> noGap.bed - this is a bed file of all regions in the
+genome that are not assembly gaps.
+<li> windowLength - this is the read length
+<li> out.stats - this is a text output file summarizing the whole genome
+<li> -wiggle (filename) - this is the output file that will go on to be
+used by copyNumberDiff.
+</ol>
+
+<li> copyNumberDiff will use the results of the two previous program, along with
+the bam files of each individual, to compute the emission probablilities of the transducer.
+<ol>
+<li> noGap.bed - this is a bed file of all regions in the
+genome that are not assembly gaps.
+<li> kmerMismaps.wig - this is the output from countKmers.  It can be compressed with
+gzip and the program will figure this out if the filename ends with .gz.
+<li> gcContent.wig - this is the output from faToGcStats.  It can be comprssed with
+gzip and the program will figure this out if the filename ends with .gz.
+<li> group1_1.bam,...,group1_N.bam - this is a comma separated list of all the bam
+files in group 1.
+<li> group2_1.bam,...,group2_N.bam - this is a comma separated list of all the bam
+files in group 2.
+<li> outputEmissionProbs.wig - this is the output of the program and it desribes
+the emission probabilities of the transducer.  It may be a good idea to send this
+to stdout and pipe it through gzip.
+<li> Good to use the -logProbs option to prevent repeated multiplications of probabilities
+from going to zero.
+</ol>
 
 </ol>
 
