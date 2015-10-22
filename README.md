@@ -74,6 +74,28 @@ make all
 </ol>
 </ol>
 
+
+Usage overview
+==========
+<ol>
+<li> Starting point
+<ol>
+<li> Reference genome
+<li> Files of reads mapped to the reference genome
+<li> Read length used during sequencing
+<ol>
+<li> This is the length of a read.  If you are using Illumina technology, then it will probably be: 36,
+76, 100, 150, etc.  At this point the program does not take into account paired-end or mate-pair technology
+and how they aids in mapping certainty.  For 100bp single-end reads, or 100bp paired-end reads, the
+read length is 100.  At this point the program assumes that all libraries where sequenced with the same
+length.  Accomodating mixed read lengths would be possible, but this has not been implemented yet.
+</ol>
+</ol>
+
+<li> Estimate mappability of reference genome for given sequencing length.
+</ol>
+
+
 References
 ==========
 
