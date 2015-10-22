@@ -92,7 +92,21 @@ length.  Accomodating mixed read lengths would be possible, but this has not bee
 </ol>
 </ol>
 
-<li> Estimate mappability of reference genome for given sequencing length.
+<li> We will use the countKmers program to help estimate the mappablity of
+each base in the reference genome.  Running the program with no arguments
+will display a help message.
+<ol>
+<li> kmerLength - this is the read length
+<li> in.fa - this is the reference genome in fasta format
+<li> noGap.bed - this is a bed file of all regions in the
+genome that are not assembly gaps.
+<li> kmers.wig - this is the output file.  You can use
+stdout as the output filename to send it to standard out.
+Doing this and piping it through gzip might be a good idea
+because the file will usually be large.
+</ol>
+
+
 </ol>
 
 
