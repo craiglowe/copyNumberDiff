@@ -147,6 +147,38 @@ to stdout and pipe it through gzip.
 from going to zero.
 </ol>
 
+<li> wgHmm is in a separate repository since it is a general purpose HMM/transducer
+program for genome-wide analyses.  Given the emission probabilities from above
+and a set of transition probabilities (penalties), it will report the most likely
+series of states (Viterbi path).  This will be the final output that will report
+the regions of repeatedly different copy number between the two groups.
+<ol>
+<li> -inputIsLog - the transition matrix and the emisison probabilities are
+interpreted as being in log-space.  This is probably a good idea in most cases.
+<li> chrom.sizes - tab separated file where the first column is the name
+of the chromosome and the second column is the length
+<li> noGaps.bed - bed file of regions no overlapping an assembly gap
+<li> numberOfStates - number of states (25 in this case)
+<li> transition.matrix - is a tab separated file where column X row Y gives the
+transition probabiliy from state X to state Y
+<ol>
+<li> setting these parameters is the hardest part of running this program.  I do
+not know of a good way to quickly calculate them.  In the past I have set them by
+simulating data sets where I know the location of repeated copy number variation.
+I then make the transition probabilities low enough to reduce false positives, while
+maintaining the ability to detect the true positives.  These parameters may go as low
+as -600 (log-space).
+</ol>
+<li> emissionProbs.wig - based on a fixed-step wiggle file, but with multiple columns
+one for each state.  This is the output of copyNumberDiff
+<li> output.bed - these are the final calls of the program and pipeline.  The first
+three columns give the genome coordinates and the next column is a number that
+describes the copy number.  The number is equal to (5 * copiesGroup2 + copiesGroup1).
+The copies are 0 for homozygous deletion, 1 for heterozygous deletion, 2 for reference,
+3 for heterozygous duplication, and 4 for homozygous duplication.  For example:
+14 = 5 * 2 + 4 = reference for group2, duplication for group1.
+</ol>
+
 </ol>
 
 
