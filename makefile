@@ -11,6 +11,10 @@ HG_INC += -I/home/lowec/kent/src/hg/inc -I/home/lowec/kent/src/inc
 L += /home/lowec/kent/src/lib/${MACHTYPE}/jkweb.a
 HG_INC += -I/home/lowec/src/gsl/gsl-1.16_install/include
 L += /home/lowec/src/gsl/gsl-1.16_install/lib/libgsl.a /home/lowec/src/gsl/gsl-1.16_install/lib/libgslcblas.a
+
+HG_INC += -I/home/lowec/src/R/R-3.1.2/include
+L += /home/lowec/src/R/R-3.1.2/src/nmath/standalone/libRmath.a
+
 #
 # END of basic editing
 #
