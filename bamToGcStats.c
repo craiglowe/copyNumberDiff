@@ -96,7 +96,7 @@ void printGcBins(double *gcBins, int32_t readLength, double totalReads, char *ou
 	{
 		percentGc = (double)i/(double)readLength;
 		percentTotal = gcBins[i]/totalReads;
-		fprintf(fout, "%u %f %f\n", i, percentGc, percentTotal);
+		fprintf(fout, "%u %f %e\n", i, percentGc, percentTotal);
 	}
 	carefulClose(&fout);
 }
