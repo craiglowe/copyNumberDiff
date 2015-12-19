@@ -19,7 +19,7 @@ files in this repository.  Austin has placed this work in the public domain.
 Installation
 ============
 
-This code uses the Kent libraries from UCSC as well as the GNU Scientific Library, so those must be installed
+This code uses the Kent libraries from UCSC as well as the GNU Scientific Library and R, so those must be installed
 to compile copyNumberDiff and its helper programs.
 
 <ol>
@@ -40,18 +40,21 @@ to compile copyNumberDiff and its helper programs.
 <ol>
 <li> Check the setting of your machtype variable with:<br />
 echo $MACHTYPE<br />
-it should be something in this list: i386 i686 sparc alpha x86_64 ppc.  If it is not, set your machtype variable.
+it should be something in this list:<br />
+i386 i686 sparc alpha x86_64 ppc<br />
+If it is not, set your machtype variable.
 If you are not sure what your MACHTYPE variable should be, you can try typing "uname -m", "uname -p", or "uname -a"
 for some hints and pick the element from the previous list that most closely matches the output.  For most people
 it will be "x86_64".
 <li> set USE_SAMTABIX to 1
 <li> set SAMTABIXDIR to locationOfRepoYouJustDownloaded
 <li> I use c-shell, so for me I add the following lines to my .cshrc (I also active USE_SSL, while compiling which may not be
-needed for many people, but probably will not hurt):
+needed for many people, but probably will not hurt):<br />
 setenv MACHTYPE x86_64<br />
 setenv USE_SSL 1<br />
 setenv USE_SAMTABIX 1<br />
 setenv SAMTABIXDIR /home/lowec/samtabix<br />
+If you like to use bash, setting a variable in your .bashrc will look more like "export USE_XXX=1"
 </ol>
 
 <li> Go to a folder on your computer where you want the kent source tree to reside and type:<br />
@@ -98,11 +101,13 @@ wget http://cran.r-project.org/src/base/R-3/R-3.2.3.tar.gz
 <li> Compile copyNumberDiff and helper programs
 <ol>
 <li> Edit the copyNumberDiff makefile so that it points to the kent and gsl libraries on your system.  These
-are the four lines you will have to modify:<br />
-HG_INC += -I/home/lowec/kent/src/hg/inc -I/home/lowec/kent/src/inc<br />
-L += /home/lowec/kent/src/lib/${MACHTYPE}/jkweb.a<br />
-HG_INC += -I/home/lowec/src/gsl/gsl-1.16_install/include<br />
+are the six lines you will have to modify:<br />
+HG_INC += -I/home/lowec/kent/src/hg/inc -I/home/lowec/kent/src/inc
+L += /home/lowec/kent/src/lib/${MACHTYPE}/jkweb.a
+HG_INC += -I/home/lowec/src/gsl/gsl-1.16_install/include
 L += /home/lowec/src/gsl/gsl-1.16_install/lib/libgsl.a /home/lowec/src/gsl/gsl-1.16_install/lib/libgslcblas.a
+HG_INC += -I/home/lowec/src/R/R-3.1.2/include
+L += /home/lowec/src/R/R-3.1.2/src/nmath/standalone/libRmath.a
 
 <li> Compile copyNumberDiff and helper programs:<br />
 make all
