@@ -9,6 +9,7 @@ HG_DEFS=-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_GNU_SOURCE -DMACHTYPE_${MA
 #
 HG_INC += -I/home/lowec/kent/src/hg/inc -I/home/lowec/kent/src/inc
 L += /home/lowec/kent/src/lib/${MACHTYPE}/jkweb.a
+
 HG_INC += -I/home/lowec/src/gsl/gsl-1.16_install/include
 L += /home/lowec/src/gsl/gsl-1.16_install/lib/libgsl.a /home/lowec/src/gsl/gsl-1.16_install/lib/libgslcblas.a
 
@@ -22,27 +23,24 @@ L += /home/lowec/src/R/R-3.1.2/src/nmath/standalone/libRmath.a
 
 ##########
 #
-# If you compiled your kent source with sam/bam and tabix support
-# then you will need to edit the below lines as well.
-# If none of that sounded familiar to you, then you probably don't
-# need to edit this.
 #
-ifeq (${USE_BAM},1)
-	SAMINC = ${SAMDIR}
-	SAMLIB = ${SAMDIR}/lib/libbam.a
-	HG_INC += -I${SAMINC}
-	L+=${SAMLIB}
-	HG_DEFS+=-DUSE_BAM
-	HG_DEFS+=-DKNETFILE_HOOKS
-	TABIXINC = ${TABIXDIR}
-	TABIXLIB = ${TABIXDIR}/libtabix.a
-	HG_INC += -I${TABIXINC}
-	L+=${TABIXLIB} -lz
-	HG_DEFS+=-DUSE_TABIX
-	HG_DEFS+=-DKNETFILE_HOOKS
+ifeq (${USE_SAMTABIX},1)
+    KNETFILE_HOOKS=1
+    USE_BAM=1
+    USE_TABIX=1
+    ifeq (${SAMTABIXINC},)
+        SAMTABIXINC = ${SAMTABIXDIR}
+    endif
+    ifeq (${SAMTABIXLIB},)
+        SAMTABIXLIB = ${SAMTABIXDIR}/libsamtabix.a
+    endif
+    HG_INC += -I${SAMTABIXINC}
+    L+=${SAMTABIXLIB} -lz
+    HG_DEFS+=-DUSE_SAMTABIX -DUSE_BAM -DUSE_TABIX -DKNETFILE_HOOKS
 endif
+
 #
-# End of sam/bam and tabix editing
+# End of sam/bam and tabix
 #
 ##########
 

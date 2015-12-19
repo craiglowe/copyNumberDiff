@@ -26,16 +26,41 @@ to compile copyNumberDiff and its helper programs.
 <li> Download and compile the Kent Libraries
 
 <ol>
+<li> Download the samtabix code for interfacing with sam/bam files<br />
+
+<ol>
+<li> Go to the directory where you would like this code repository to be located<br />
+<li> git clone http://genome-source.cse.ucsc.edu/samtabix.git samtabix<br />
+<li> cd samtabix<br />
+<li> make<br />
+</ol>
+
+<li> Set environment variables
+
+<ol>
 <li> Check the setting of your machtype variable with:<br />
 echo $MACHTYPE<br />
 it should be something in this list: i386 i686 sparc alpha x86_64 ppc.  If it is not, set your machtype variable.
+If you are not sure what your MACHTYPE variable should be, you can try typing "uname -m", "uname -p", or "uname -a"
+for some hints and pick the element from the previous list that most closely matches the output.  For most people
+it will be "x86_64".
+<li> set USE_SAMTABIX to 1
+<li> set SAMTABIXDIR to locationOfRepoYouJustDownloaded
+<li> I use c-shell, so for me I add the following lines to my .cshrc (I also active USE_SSL, while compiling which may not be
+needed for many people, but probably will not hurt):
+setenv MACHTYPE x86_64<br />
+setenv USE_SSL 1<br />
+setenv USE_SAMTABIX 1<br />
+setenv SAMTABIXDIR /home/lowec/samtabix<br />
+</ol>
+
 <li> Go to a folder on your computer where you want the kent source tree to reside and type:<br />
 git clone git://genome-source.cse.ucsc.edu/kent.git<br />
 to download the repository onto your own computer.
-<li> go to the src/lib directory within the kent source repo that you just cloned:<br />
-cd kent/src/lib<br />
+<li> go to the src directory within the kent source repo that you just cloned:<br />
+cd kent/src<br />
 <li> Compile the libraries<br />
-make
+make libs
 <li> If this was successful, you should have a file here:<br />
 kent/src/lib/x86_64/jkweb.a<br />
 the x86_64 will be the machtype of your machine.</br />
@@ -50,12 +75,24 @@ kent/src/product/README.building.source
 <ol>
 <li> Get GSL:<br />
 wget ftp://ftp.gnu.org/gnu/gsl/gsl-1.16.tar.gz
+<li> Unpack the file you downloaded and go into the directory
 <li> Configure the make files and you may want to use the prefix option to change the install path:<br />
 ./configure --prefix=/home/lowec/src/gsl/gsl-1.16_install
 <li> Compile the source:<br />
 make
 <li> Move the library to the install location:<br />
 make install
+</ol>
+
+<li> Download and compile R
+
+<ol>
+<li> Get R:<br />
+wget http://cran.r-project.org/src/base/R-3/R-3.2.3.tar.gz
+<li> Unpack the file you downloaded and go into the directory
+<li> ./configure
+<li> cd src/nmath/standalone
+<li> make static
 </ol>
 
 <li> Compile copyNumberDiff and helper programs
