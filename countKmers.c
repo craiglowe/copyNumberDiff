@@ -61,7 +61,7 @@ struct kmerData *createKmerData(unsigned int kmerLength)
 	AllocVar(answer);
 	answer->length = kmerLength;
 	answer->totalCount = 0;
-	answer->counts = newHash(32);
+	answer->counts = newHash(28);
 	return(answer);
 }
 
