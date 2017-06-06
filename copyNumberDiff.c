@@ -32,6 +32,8 @@ static struct optionSpec optionSpecs[] =
 	{"chrom", OPTION_STRING},
 	{"minQual", OPTION_INT},
 	{"gcPseudo", OPTION_DOUBLE},
+	{"noHet", OPTION_BOOLEAN},
+	{"epsilon", OPTION_DOUBLE},
 	{NULL, 0}
 };
 
@@ -41,6 +43,8 @@ int optMinQual = 0;
 boolean optLogProbs = FALSE;
 boolean optDebugStats = FALSE;
 double optGcPseudo = 0;
+boolean optNoHet = FALSE;
+double optEpsilon = 0.01;
 
 /*---------------------------------------------------------------------------*/
 
@@ -58,6 +62,8 @@ errAbort(
 	"   -logProbs        (false)    Do some of the calculations and report the emission probs as log(probs)\n"
 	"   -debugStats      (false)    Give output for debugging different distributions\n"
 	"   -gcPseudo        (0)        Can get zero probabilities if GC-content of a genomic region was never seen in a read\n"
+	"   -noHet           (false)    Eliminate the states for heterozygous deletions and duplications\n"
+	"   -epsilon         (0.01)     Adjustment to expected mismapping\n"
 	);
 }
 
@@ -328,7 +334,7 @@ double probOfDepth(unsigned int depth, unsigned int copyNumber, double totalRead
 
 	for(i=start; i<=basePos; i++)
 	{
-		correctedMisMaps = (double)kmerMismaps[i] + 0.01 * ((double)kmerMismaps[i] + 1.0);
+		correctedMisMaps = (double)kmerMismaps[i] + optEpsilon * ((double)kmerMismaps[i] + 1.0);
 		numer = (double)copyNumber + correctedMisMaps * 2.0;
 		denom = (double)totalKmers * 2.0 * (correctedMisMaps + 1.0);
 		prob += numer / denom * gcCorrection[gcContent[basePos]];
@@ -374,67 +380,89 @@ double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber
 	bam1_core_t *c = NULL;
 	char *chrom = NULL;
 	int chromId = -1;
-	unsigned int x=0, chromStart=0, refCount=0, at=0, gc=0, ns=0;
+	unsigned int x=0, chromStart=0, queryCount=0, refCount=0, at=0, gc=0, ns=0;
 	unsigned int **coverage = NULL;
 	char op = '?';
 	int n = 0, i = 0;
 	unsigned int *cigarPacked = NULL;
-	double totalBaseCoverage = 0, used = 0, notUsed = 0, cigarCount = 0, usedGc = 0;
+	//double totalBaseCoverage = 0;
+	double used = 0, notUsed = 0, usedGc = 0;
 	uint8_t *seq = NULL;
 	uint32_t base = 0;
+	char secondTryChrom[1024];
 
 	while(samread(samFp, b) >= 0)
 	{
 		c = &b->core;
-		if((c->qual >= optMinQual) && (!(c->flag&(BAM_FSECONDARY|BAM_FQCFAIL|BAM_FDUP|BAM_FUNMAP))))
+		//added a check that read is at least kmerLength in length.  Longer reads will be trimmed
+		//verbose(4, "query length: %d  kmerLength: %u\n", c->l_qseq, kmerLength);
+		if((c->qual >= optMinQual) && (c->l_qseq >= kmerLength) && (!(c->flag&(BAM_FSECONDARY|BAM_FQCFAIL|BAM_FDUP|BAM_FUNMAP))))
 		{
+			//verbose(4, "inside\n");
+			used++;
+
 			if(c->tid != chromId)
 			{
 				chromId = c->tid;
 				chrom = samFp->header->target_name[chromId];
-				if(optChrom == NULL || sameString(optChrom, chrom)){coverage = hashMustFindVal(coverageHash, chrom);}
+				sprintf(secondTryChrom, "chr%s", chrom);
+				verbose(3, "Looking for coverage data structure for %s or %s\n", chrom, secondTryChrom);
+				if(optChrom == NULL || sameString(optChrom, chrom) || sameString(optChrom, secondTryChrom))
+				{
+					coverage = hashFindVal(coverageHash, chrom);
+					if(coverage == NULL){coverage = hashFindVal(coverageHash, secondTryChrom);}
+				}
 				else{coverage = NULL;}
+				if(coverage == NULL){verbose(3, "Did not find coverage data structure for %s or %s\n", chrom, secondTryChrom);}
+				else{verbose(3, "Found coverage data structure for %s or %s\n", chrom, secondTryChrom);}
 			}
 
-			if(kmerLength <= c->l_qseq)
+			seq = bam1_seq(b);
+			for(i = 0, at = 0, gc = 0, ns = 0;  i < kmerLength;  i++)
 			{
-				seq = bam1_seq(b);
-				for(i = 0, at = 0, gc = 0, ns = 0;  i < kmerLength;  i++)
-				{
-					base = bam1_seqi(seq, i);
-					if(base == 1 || base == 8){at++;}
-					else if(base == 2 || base == 4){gc++;}
-					else if(base == 15){ns++;}
-					else{errAbort("Base: %u not recognized\n", base);}
-				}
-				if(ns == 0)
-				{
-					usedGc++;
-					readGcBins[sampleNumber][gc]++;
-				}
+				base = bam1_seqi(seq, i);
+				if(base == 1 || base == 8){at++;}
+				else if(base == 2 || base == 4){gc++;}
+				else if(base == 15){ns++;}
+				else{errAbort("Base: %u not recognized\n", base);}
 			}
-
-			chromStart = c->pos;
+			if(ns == 0)
+			{
+				usedGc++;
+				readGcBins[sampleNumber][gc]++;
+			}
+			
 			if(coverage != NULL)
 			{
+				chromStart = c->pos;
 				cigarPacked = bam1_cigar(b);
-				for (i = 0, refCount = 0;  i < c->n_cigar;  i++)
+				for (i = 0, refCount = 0, queryCount=0;  i < c->n_cigar;  i++)
 				{
 					n = bamUnpackCigarElement(cigarPacked[i], &op);
 					if(op == 'M' || op == '=' || op == 'X')
 					{
 						for(x = 0; x < n; x++)
 						{
-							coverage[sampleNumber][chromStart+refCount+x]++;
+							if(queryCount < kmerLength)
+							{
+								//coverage[sampleNumber][chromStart+refCount+x]++;
+								coverage[sampleNumber][chromStart+refCount]++;
+								queryCount++;
+								refCount++;
+							}
 						}
-						totalBaseCoverage += n;
-						refCount += n;
+						//totalBaseCoverage += x;
+						//refCount += x;
 					}
 					else if(op == 'D' || op == 'N')
 					{
 						refCount += n;	
 					}
-					else if(op == 'I' || op == 'P')
+					else if(op == 'I')
+					{
+						queryCount +=n;
+					}
+					else if(op == 'P')
 					{
 					}
 					else if(op == 'S' || op == 'H')
@@ -445,11 +473,12 @@ double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber
 						errAbort("bamShowCigarEnglish: unrecognized CIGAR op %c -- update me", op);
 					}
 				}
+				//used++;
 			}
-			else
+			/*else
 			{
 				cigarPacked = bam1_cigar(b);
-				cigarCount += c->n_cigar;
+				//cigarCount += c->n_cigar;
 				for (i = 0, refCount = 0;  i < c->n_cigar;  i++)
 				{
 					n = bamUnpackCigarElement(cigarPacked[i], &op);
@@ -458,8 +487,7 @@ double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber
 						totalBaseCoverage += n;
 					}
 				}
-			}
-			used++;
+			}*/
 		}
 		else{notUsed++;}
 	}
@@ -474,8 +502,6 @@ double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber
 			errAbort("Error: calculated a probability of zero for a read mapping based on GC-content.  You should increase pseudocounts.");
 		}
 	}
-
-	verbose(2, "%f %f\n", totalBaseCoverage, used);
 	return(used);
 }
 
@@ -486,34 +512,37 @@ void calcEmissionProbs(unsigned int numSamplesOne, unsigned int numSamplesTwo, d
 	double lastProb = 0;
 
 	numSamples = numSamplesOne + numSamplesTwo;
-	for(copyNumber=0; copyNumber<=maxCopy; copyNumber++)
+	for(copyNumber=0; copyNumber<=maxCopy; copyNumber+=1)
 	{
-		currProbsOne[copyNumber] = 0;
-		currProbsTwo[copyNumber] = 0;
-		for(sampleNumber=0; sampleNumber < numSamplesOne; sampleNumber++)
+		if(optNoHet == FALSE || copyNumber % 2 == 0)
 		{
-			lastProb =  currProbsOne[copyNumber];
-			currProbsOne[copyNumber] = multiplyLog(currProbsOne[copyNumber], probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber])); //pm->prob[sampleNumber][depth[sampleNumber][basePos]][copyNumber]);
-			if(currProbsOne[copyNumber] == -INFINITY)
+			currProbsOne[copyNumber] = 0;
+			currProbsTwo[copyNumber] = 0;
+			for(sampleNumber=0; sampleNumber < numSamplesOne; sampleNumber++)
 			{
-				errAbort("Error: Probability has gone to zero: %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
+				lastProb =  currProbsOne[copyNumber];
+				currProbsOne[copyNumber] = multiplyLog(currProbsOne[copyNumber], probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber])); //pm->prob[sampleNumber][depth[sampleNumber][basePos]][copyNumber]);
+				if(currProbsOne[copyNumber] == -INFINITY)
+				{
+					errAbort("Error: Probability has gone to zero: %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
+				}
+				if(isnan(currProbsOne[copyNumber]))
+				{
+					errAbort("Error: Probability is not defined: %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
+				}
 			}
-			if(isnan(currProbsOne[copyNumber]))
+			for(sampleNumber=numSamplesOne; sampleNumber < numSamples; sampleNumber++)
 			{
-				errAbort("Error: Probability is not defined: %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
-			}
-		}
-		for(sampleNumber=numSamplesOne; sampleNumber < numSamples; sampleNumber++)
-		{
-			lastProb = currProbsTwo[copyNumber];
-			currProbsTwo[copyNumber] = multiplyLog(currProbsTwo[copyNumber], probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]));
-			if(currProbsTwo[copyNumber] == -INFINITY)
-			{
-				errAbort("Error: Probability has gone to zero %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
-			}
-			if(isnan(currProbsTwo[copyNumber]))
-			{
-				errAbort("Error: Probability is not defined: %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
+				lastProb = currProbsTwo[copyNumber];
+				currProbsTwo[copyNumber] = multiplyLog(currProbsTwo[copyNumber], probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]));
+				if(currProbsTwo[copyNumber] == -INFINITY)
+				{
+					errAbort("Error: Probability has gone to zero %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
+				}
+				if(isnan(currProbsTwo[copyNumber]))
+				{
+					errAbort("Error: Probability is not defined: %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
+				}
 			}
 		}
 	}
@@ -522,7 +551,10 @@ void calcEmissionProbs(unsigned int numSamplesOne, unsigned int numSamplesTwo, d
 	{
 		for(groupTwoCopyNumber=0; groupTwoCopyNumber <= maxCopy; groupTwoCopyNumber+=1)
 		{
-			currProbs[groupOneCopyNumber][groupTwoCopyNumber] = multiplyLog(currProbsOne[groupOneCopyNumber], currProbsTwo[groupTwoCopyNumber]);
+			if(optNoHet == FALSE || (groupOneCopyNumber % 2 == 0 && groupTwoCopyNumber % 2 == 0))
+			{
+				currProbs[groupOneCopyNumber][groupTwoCopyNumber] = multiplyLog(currProbsOne[groupOneCopyNumber], currProbsTwo[groupTwoCopyNumber]);
+			}
 		}
 	}
 }
@@ -670,8 +702,11 @@ void printProbabilities(unsigned int numSamplesOne, unsigned int numSamplesTwo, 
 				{
 					for(j=0; j<=maxCopy; j+=1)
 					{
-						if(optLogProbs){fprintf(fout, "%e\t", currProbs[i][j]);}
-						else{fprintf(fout, "%e\t", exp(currProbs[i][j]));}
+						if(optNoHet == FALSE || (i % 2 == 0 && j % 2 == 0))
+						{
+							if(optLogProbs){fprintf(fout, "%e\t", currProbs[i][j]);}
+							else{fprintf(fout, "%e\t", exp(currProbs[i][j]));}
+						}
 					}
 				}
 				fprintf(fout, "\n");
@@ -778,6 +813,8 @@ int main(int argc, char *argv[])
 	optLogProbs = optionExists("logProbs");
 	optDebugStats = optionExists("debugStats");
 	optGcPseudo = optionDouble("gcPseudo", optGcPseudo);
+	optNoHet = optionExists("noHet");
+	optEpsilon = optionDouble("epsilon", optEpsilon);
 
 	copyNumberDiff(argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);
 

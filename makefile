@@ -93,7 +93,7 @@ CFLAGS += ${HG_WARN}
 
 L += -lm -lz
 
-all: copyNumberDiff countKmers faToGcStats bamToGcStats
+all: copyNumberDiff countKmers countKmersWithTree faToGcStats fastqTrim bamToGcStats
 
 copyNumberDiff: copyNumberDiff.o ${MYLIBS}
 	${CC} ${COPT} -o copyNumberDiff${EXE} copyNumberDiff.o ${MYLIBS} $L
@@ -101,8 +101,14 @@ copyNumberDiff: copyNumberDiff.o ${MYLIBS}
 countKmers: countKmers.o murmur3.o ${MYLIBS}
 	${CC} ${COPT} -o countKmers${EXE} countKmers.o murmur3.o ${MYLIBS} $L
 
+countKmersWithTree: countKmersWithTree.o ${MYLIBS}
+	${CC} ${COPT} -o countKmersWithTree${EXE} countKmersWithTree.o ${MYLIBS} $L
+
 faToGcStats: faToGcStats.o ${MYLIBS}
 	${CC} ${COPT} -o faToGcStats${EXE} faToGcStats.o ${MYLIBS} $L
+
+fastqTrim: fastqTrim.o ${MYLIBS}
+	${CC} ${COPT} -o fastqTrim${EXE} fastqTrim.o ${MYLIBS} $L
 
 bamToGcStats: bamToGcStats.o ${MYLIBS}
 	${CC} ${COPT} -o bamToGcStats${EXE} bamToGcStats.o ${MYLIBS} $L
@@ -110,5 +116,5 @@ bamToGcStats: bamToGcStats.o ${MYLIBS}
 murmur3.o: murmur3.c murmur3.h
 
 clean:
-	rm -f copyNumberDiff copyNumberDiff.o countKmers countKmers.o faToGcStats faToGcStats.o bamToGcStats bamToGcStats.o murmur3.o
+	rm -f copyNumberDiff copyNumberDiff.o countKmers countKmers.o faToGcStats faToGcStats.o bamToGcStats bamToGcStats.o murmur3.o fastqTrim fastqTrim.o countKmersWithTree countKmersWithTree.o
 

@@ -131,6 +131,7 @@ double gatherGcStats(struct dnaSeq *seqList, struct hash *noGapHash, unsigned in
 	{
 		for(currRegion = hashFindVal(noGapHash, currSeq->name); currRegion != NULL; currRegion = currRegion->next)
 		{
+			verbose(3, " analyzing %s %u %u\n", currRegion->chrom, currRegion->chromStart, currRegion->chromEnd);
 			for(i = currRegion->chromStart; i <= currRegion->chromEnd - windowLength; i++)
 			{
 				currWindow = &(currSeq->dna[i]);
@@ -176,10 +177,10 @@ void faToGcStats(char *inFaFile, char *noGapBedFile, unsigned int windowSize, ch
 	verbose(2, "reading in no gap file\n");
 	noGapHash = bedLoadNInHash(noGapBedFile, 3);
 
-	verbose(2, "finding the kmers that appear more than once\n");
+	verbose(2, "calculating the gc content of the genome\n");
 	totalWindows = gatherGcStats(seqList, noGapHash, windowSize, gcBins);
 	
-	verbose(2, "writing uniqueness of each position\n");
+	verbose(2, "writing output for of each position\n");
 	writeOutput(gcBins, windowSize, totalWindows, outFile);
 
 	if(optWiggle != NULL)

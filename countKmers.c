@@ -42,15 +42,15 @@ errAbort(
 struct kmerData
 {
 	unsigned int length;
-	unsigned int  totalCount;
+	unsigned int totalCount;
 	struct hash *counts;
 };
 
 
 struct bloomFilter
 {
-	unsigned int *table;
-	unsigned int tabLen;
+	uint64_t *table;
+	uint64_t tabLen;
 	unsigned int numFunc;
 };
 
@@ -70,7 +70,7 @@ struct bloomFilter *createBloomFilter()
 {
 	struct bloomFilter *answer = NULL;
 	AllocVar(answer);
-	answer->tabLen = 1e9;
+	answer->tabLen = 5e8;
 	answer->numFunc = 5;
 	AllocArray(answer->table, answer->tabLen);
 	return(answer);
@@ -86,6 +86,33 @@ void freeBloom(struct bloomFilter **pEl)
 		freeMem(el->table);
 		freez(pEl);
 	}
+}
+
+// The following code I read on wikipedia to calculate
+// the Hamming Weight / Pop Count of an int64
+const uint64_t m1  = 0x5555555555555555;
+const uint64_t m2  = 0x3333333333333333;
+const uint64_t m4  = 0x0f0f0f0f0f0f0f0f;
+int popCount(uint64_t x) {
+    x -= (x >> 1) & m1;
+    x = (x & m2) + ((x >> 2) & m2);
+    x = (x + (x >> 4)) & m4;
+    x += x >> 8;
+    x += x >> 16;
+    x += x >> 32;
+    return(x & 0x7f);
+}
+
+
+double bloomPercentUsed(struct bloomFilter *bloom)
+{
+	unsigned int idx = 0;
+	double count = 0;
+	for(idx=0; idx<bloom->tabLen; idx++)
+	{
+		count += popCount(bloom->table[idx]);
+	}
+	return(count / (64.0 * (double)bloom->tabLen));
 }
 
 
@@ -177,6 +204,28 @@ struct hash *createBasewiseHash(struct hash *noGapHash)
 }
 
 
+void packDna(char *src, char *dest, unsigned int len)
+{
+	unsigned int packedLen = (len + 2) / 3;
+	dest[packedLen] = '\0';
+	char twoBit = 0;
+	unsigned x=0, y=0;
+
+	for(x=0; x*3<len; x++)
+	{
+		dest[x] = 32;
+		for(y=0; y<3 && x*3+y<len; y++)
+		{
+			if(src[x*3+y] == 'A' || src[x*3+y] == 'a'){twoBit=0;}
+                	else if(src[x*3+y] == 'C' || src[x*3+y] == 'c'){twoBit=1;}
+                	else if(src[x*3+y] == 'G' || src[x*3+y] == 'g'){twoBit=2;}
+                	else if(src[x*3+y] == 'T' || src[x*3+y] == 't'){twoBit=3;}
+                	else{errAbort("Error: unexpected character (%c)\n", src[x*3+y]);}
+			dest[x] += twoBit << (4-2*y);
+		}
+	}
+	verbose(5, "unpacked:%s, packed:%s\n", src, dest);
+}
 
 void revComp(char *src, char *dest, unsigned int len)
 {
@@ -193,6 +242,7 @@ void revComp(char *src, char *dest, unsigned int len)
 	}
 }
 
+
 void recordIndividualKmerSecondPass(char *currKmer, struct kmerData *answer)
 {
 	struct hashEl *hel = NULL;
@@ -200,14 +250,17 @@ void recordIndividualKmerSecondPass(char *currKmer, struct kmerData *answer)
 	hel = hashLookup(answer->counts, currKmer);
 	if(hel != NULL)
 	{
-		unsigned int *counter = NULL;
+		/*
+ 		unsigned int *counter = NULL;
 		counter = hel->val;
 		(*counter)++;
+		*/
+		hashIncInt(answer->counts, currKmer);
 	}
 }
 
 
-void recordIndividualKmerFirstPass(char *currKmer, struct bloomFilter *bloom, struct kmerData *answer)
+int recordIndividualKmerFirstPass(char *currKmer, struct bloomFilter *bloom, struct kmerData *answer)
 {
 	struct hashEl *hel = NULL;
 
@@ -216,21 +269,27 @@ void recordIndividualKmerFirstPass(char *currKmer, struct bloomFilter *bloom, st
 		hel = hashLookup(answer->counts, currKmer);
 		if(hel == NULL)
 		{
-			unsigned int *temp = NULL;
+			/*
+			uint32_t *temp = NULL;
 			AllocVar(temp);
 			*temp = 0;
 			hashAdd(answer->counts, currKmer, temp);
+			*/
+			hashAddInt(answer->counts, currKmer, 0);
+			return(1);
 		}
 	}
 	else
 	{
 		putInBloom(currKmer, bloom);
 	}
+	return(0);
 }
 
 
 unsigned int getKmerCount(char *currKmer, struct kmerData *kmers)
 {
+	/*
 	struct hashEl *hel = hashLookup(kmers->counts, currKmer);
 	if(hel == NULL){return(1);}
 	else
@@ -238,6 +297,8 @@ unsigned int getKmerCount(char *currKmer, struct kmerData *kmers)
 		unsigned int *count = hel->val;
 		return(*count);
 	}
+	*/
+	return(hashIntValDefault(kmers->counts, currKmer, 1));
 }
 
 
@@ -249,8 +310,11 @@ struct kmerData *populateKmerHash(struct dnaSeq *seqList, struct hash *noGapHash
 	char *currKmer = NULL;
 	struct bloomFilter *bloom = createBloomFilter();
 	char revCompKmer[kmerLength+1];
+	unsigned int packedLen = (kmerLength + 2) / 3;
+	char packedKmer[packedLen+1];
 	char temp;
 	struct kmerData *answer = createKmerData(kmerLength);
+	unsigned int itemsInHash = 0;
 
 	for(currSeq = seqList; currSeq != NULL; currSeq = currSeq->next)
 	{
@@ -259,15 +323,33 @@ struct kmerData *populateKmerHash(struct dnaSeq *seqList, struct hash *noGapHash
 		{
 			for(i = currRegion->chromStart; i <= currRegion->chromEnd - kmerLength; i++)
 			{
-				temp = currSeq->dna[i+kmerLength];
+				/*temp = currSeq->dna[i+kmerLength];
 				currSeq->dna[i+kmerLength] = '\0';
 				currKmer = &(currSeq->dna[i]);
 				recordIndividualKmerFirstPass(currKmer, bloom, answer);
 				revComp(currKmer, revCompKmer, kmerLength);
 				recordIndividualKmerFirstPass(revCompKmer, bloom, answer);
-				currSeq->dna[i+kmerLength] = temp;
+				currSeq->dna[i+kmerLength] = temp;*/
+
+				temp = currSeq->dna[i+kmerLength];
+                                currSeq->dna[i+kmerLength] = '\0';
+                                currKmer = &(currSeq->dna[i]);
+				revComp(currKmer, revCompKmer, kmerLength);
+				if(strcmp(currKmer, revCompKmer) <= 0)
+				{
+					packDna(currKmer, packedKmer, kmerLength);
+	                                itemsInHash += recordIndividualKmerFirstPass(packedKmer, bloom, answer);
+				}
+				else
+				{
+					packDna(revCompKmer, packedKmer, kmerLength);
+                                	itemsInHash += recordIndividualKmerFirstPass(packedKmer, bloom, answer);
+				}
+                                currSeq->dna[i+kmerLength] = temp;
 			}
+			//verbose(4, "  itemsInHash:%u percentUsed:%f\n", itemsInHash, bloomPercentUsed(bloom));
 		}
+		verbose(3, "  itemsInHash:%u percentUsed:%f\n", itemsInHash, bloomPercentUsed(bloom));
 	}
 	freeBloom(&bloom);
 	return(answer);
@@ -281,8 +363,10 @@ void recordKmers(struct dnaSeq *seqList, struct hash *noGapHash, unsigned int km
 	int i = 0;
 	char *currKmer = NULL;
 	char revCompKmer[kmerLength+1];
+	unsigned int packedLen = (kmerLength + 2) / 3;
+	char packedKmer[packedLen+1];
 	char temp;
-
+	
 	for(currSeq = seqList; currSeq != NULL; currSeq = currSeq->next)
 	{
 		verbose(3, " currently on %s\n", currSeq->name);
@@ -290,13 +374,29 @@ void recordKmers(struct dnaSeq *seqList, struct hash *noGapHash, unsigned int km
 		{
 			for(i = currRegion->chromStart; i <= currRegion->chromEnd - kmerLength; i++)
 			{
-				temp = currSeq->dna[i+kmerLength];
+				/*temp = currSeq->dna[i+kmerLength];
 				currSeq->dna[i+kmerLength] = '\0';
 				currKmer = &(currSeq->dna[i]);
 				recordIndividualKmerSecondPass(currKmer, answer);
 				revComp(currKmer, revCompKmer, kmerLength);
 				recordIndividualKmerSecondPass(revCompKmer, answer);
-				currSeq->dna[i+kmerLength] = temp;
+				currSeq->dna[i+kmerLength] = temp;*/
+
+				temp = currSeq->dna[i+kmerLength];
+                                currSeq->dna[i+kmerLength] = '\0';
+                                currKmer = &(currSeq->dna[i]);
+				revComp(currKmer, revCompKmer, kmerLength);
+				if(strcmp(currKmer, revCompKmer) <= 0)
+				{
+					packDna(currKmer, packedKmer, kmerLength);
+                                	recordIndividualKmerSecondPass(packedKmer, answer);
+				}
+				else
+				{
+					packDna(revCompKmer, packedKmer, kmerLength);
+                                	recordIndividualKmerSecondPass(packedKmer, answer);
+				}
+                                currSeq->dna[i+kmerLength] = temp;
 			}
 		}
 	}
@@ -311,6 +411,9 @@ void calcUniqueness(struct dnaSeq *seqList, struct hash *noGapHash, unsigned int
 	char temp;
 	unsigned int *maps = NULL;
 	unsigned int i = 0, counts = 0;
+	char revCompKmer[kmerLength+1];
+	unsigned int packedLen = (kmerLength + 2) / 3;
+	char packedKmer[packedLen+1];
 
 	for(currSeq = seqList; currSeq != NULL; currSeq = currSeq->next)
 	{
@@ -322,7 +425,17 @@ void calcUniqueness(struct dnaSeq *seqList, struct hash *noGapHash, unsigned int
 				temp = currSeq->dna[i+kmerLength];
 				currSeq->dna[i+kmerLength] = '\0';
 				currKmer = &(currSeq->dna[i]);
-				counts = getKmerCount(currKmer, kmers);
+				revComp(currKmer, revCompKmer, kmerLength);
+				if(strcmp(currKmer, revCompKmer) <= 0)
+				{
+					packDna(currKmer, packedKmer, kmerLength);
+					counts = getKmerCount(packedKmer, kmers);
+				}
+				else
+				{
+					packDna(revCompKmer, packedKmer, kmerLength);
+					counts = getKmerCount(packedKmer, kmers);
+				}
 				maps[i]=counts;
 				currSeq->dna[i+kmerLength] = temp;
 			}
@@ -345,7 +458,7 @@ void writeOutput(struct hash *noGapHash, struct hash *mapsHash, struct kmerData 
 		maps = hel->val;
 		for(bunk = hashMustFindVal(noGapHash, hel->name); bunk != NULL; bunk=bunk->next)
 		{
-			fprintf(fout, "fixedStep chrom=%s start=%u step=1 kmerLength %u totalKmers %u\n", bunk->chrom, bunk->chromStart+1, kd->length, kd->totalCount/2);
+			fprintf(fout, "fixedStep chrom=%s start=%u step=1 kmerLength %u totalKmers %u\n", bunk->chrom, bunk->chromStart+1, kd->length, kd->totalCount);
 			for(i=bunk->chromStart; i <= bunk->chromEnd - kmerLength; i++)
 			{
 				if(maps[i] == 0){errAbort("How is this zero? chrom=%s base=%u\n", bunk->chrom, i);}
