@@ -1,18 +1,22 @@
 #!/bin/csh -ef
 
+# edit the below lines to point to the programs on your system
 set evolveGenome = "/home/lowec/code/cTools/evolveGenome/evolveGenome"
 set countKmers = "/home/lowec/code/cTools/copyNumberDiff/countKmers"
 set faToGcStats = "/home/lowec/code/cTools/copyNumberDiff/faToGcStats"
 set copyNumberDiff = "/home/lowec/code/cTools/copyNumberDiff/copyNumberDiff"
+set wgHmm = "/home/lowec/code/cTools/wgHmm/wgHmm"
 set art = "/home/lowec/src/art/art_bin_VanillaIceCream/art_illumina"
 set bwa = "/home/lowec/src/bwa/bwa-0.7.12/bwa"
 set samtools = "/home/lowec/src/samtools/samtools-1.3.1/samtools"
-set wgHmm = "/home/lowec/code/cTools/wgHmm/wgHmm"
 
+# these files should already be in the folder.  They are one
+# chromosome from the stickleback assembly
 set chromSizes = "gasAcu1.chrXXI.chromSizes"
 set startingGenome = "gasAcu1.chrXXI.fa"
 set noGap = "gasAcu1.chrXXI.noGap.bed"
 
+# this is how you control how many individuals are in each group
 set groupOneRef = "ref/g1.1.bam,ref/g1.2.bam,ref/g1.3.bam,ref/g1.4.bam,ref/g1.5.bam"
 set groupTwoRef = "ref/g2.1.bam,ref/g2.2.bam,ref/g2.3.bam,ref/g2.4.bam,ref/g2.5.bam"
 set groupTwoDel = "del/g2.1.bam,del/g2.2.bam,del/g2.3.bam,del/g2.4.bam,del/g2.5.bam"
