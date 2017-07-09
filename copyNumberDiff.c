@@ -29,6 +29,7 @@ static struct optionSpec optionSpecs[] =
 	{"maxReadDepth", OPTION_INT},
 	{"logProbs", OPTION_BOOLEAN},
 	{"debugStats", OPTION_BOOLEAN},
+	{"debugStates", OPTION_BOOLEAN},
 	{"chrom", OPTION_STRING},
 	{"minQual", OPTION_INT},
 	{"gcPseudo", OPTION_DOUBLE},
@@ -42,6 +43,7 @@ char *optRoi = NULL;
 int optMinQual = 0;
 boolean optLogProbs = FALSE;
 boolean optDebugStats = FALSE;
+boolean optDebugStates = FALSE;
 double optGcPseudo = 0;
 boolean optNoHet = FALSE;
 double optEpsilon = 0.01;
@@ -61,6 +63,7 @@ errAbort(
 	"   -chrom           (NULL)     Restrict both chrom info and bams to only this chromosome\n"
 	"   -logProbs        (false)    Do some of the calculations and report the emission probs as log(probs)\n"
 	"   -debugStats      (false)    Give output for debugging different distributions\n"
+	"   -debugStates     (false)    Give the groups separately instead of together\n"
 	"   -gcPseudo        (0)        Can get zero probabilities if GC-content of a genomic region was never seen in a read\n"
 	"   -noHet           (false)    Eliminate the states for heterozygous deletions and duplications\n"
 	"   -epsilon         (0.01)     Adjustment to expected mismapping\n"
@@ -339,6 +342,7 @@ double probOfDepth(unsigned int depth, unsigned int copyNumber, double totalRead
 		denom = (double)totalKmers * 2.0 * (correctedMisMaps + 1.0);
 		prob += numer / denom * gcCorrection[gcContent[basePos]];
 	}
+	verbose(4, "correctedMisMaps=%f numer=%f denom=%e gcCorr=%f\n", correctedMisMaps, numer, denom, gcCorrection[gcContent[basePos]]);
 	verbose(4, "depth=%u prob=%e totalReads=%f\n", depth, prob, totalReads);
 	//return(log(binomPdfApproxPoisson(depth, prob, totalReads)));
 	return(dbinom(depth, totalReads, prob, 1));
@@ -497,8 +501,10 @@ double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber
 	for(i=0; i<=kmerLength; i++)
 	{
 		readGcBins[sampleNumber][i] = ((gcPseudoCounts + readGcBins[sampleNumber][i]) / (gcPseudoCounts * (kmerLength+1) + usedGc)) / genomicGcBins[i];
+		verbose(4, "sample=%d bin=%d bias=%f\n", sampleNumber, i, readGcBins[sampleNumber][i]);
 		if(readGcBins[sampleNumber][i] == 0)
 		{
+			verbose(3, "readGcBins=%e usedGc=%e genomicGcBins=%e sampleNumber=%d\n", readGcBins[sampleNumber][i], usedGc, genomicGcBins[i], sampleNumber);
 			errAbort("Error: calculated a probability of zero for a read mapping based on GC-content.  You should increase pseudocounts.");
 		}
 	}
@@ -522,6 +528,7 @@ void calcEmissionProbs(unsigned int numSamplesOne, unsigned int numSamplesTwo, d
 			{
 				lastProb =  currProbsOne[copyNumber];
 				currProbsOne[copyNumber] = multiplyLog(currProbsOne[copyNumber], probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber])); //pm->prob[sampleNumber][depth[sampleNumber][basePos]][copyNumber]);
+				//uglyf("debug: %d %d %f %f\n", copyNumber, sampleNumber, currProbsOne[copyNumber], probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]));
 				if(currProbsOne[copyNumber] == -INFINITY)
 				{
 					errAbort("Error: Probability has gone to zero: %e %e %u %u %u\n", lastProb, probOfDepth(depth[sampleNumber][basePos], copyNumber, totalReads[sampleNumber], totalKmerCount, kmerLength, kmerMisMaps, noGapBed, basePos, gcContent, gcCorrection[sampleNumber]), depth[sampleNumber][basePos], copyNumber, basePos);
@@ -704,10 +711,15 @@ void printProbabilities(unsigned int numSamplesOne, unsigned int numSamplesTwo, 
 					{
 						if(optNoHet == FALSE || (i % 2 == 0 && j % 2 == 0))
 						{
-							if(optLogProbs){fprintf(fout, "%e\t", currProbs[i][j]);}
-							else{fprintf(fout, "%e\t", exp(currProbs[i][j]));}
+							if(!optDebugStates)
+							{
+								if(optLogProbs){fprintf(fout, "%e\t", currProbs[i][j]);}
+								else{fprintf(fout, "%e\t", exp(currProbs[i][j]));}
+							}
 						}
 					}
+					if(optDebugStates && (optNoHet == FALSE || i % 2 == 0))
+					{fprintf(fout, "%e\t%e\t", currProbsOne[i], currProbsTwo[i]);}
 				}
 				fprintf(fout, "\n");
 			}
@@ -812,6 +824,7 @@ int main(int argc, char *argv[])
 	optMinQual = optionInt("minQual", optMinQual);
 	optLogProbs = optionExists("logProbs");
 	optDebugStats = optionExists("debugStats");
+	optDebugStates = optionExists("debugStates");
 	optGcPseudo = optionDouble("gcPseudo", optGcPseudo);
 	optNoHet = optionExists("noHet");
 	optEpsilon = optionDouble("epsilon", optEpsilon);
