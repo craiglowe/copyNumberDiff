@@ -26,15 +26,6 @@ to compile copyNumberDiff and its helper programs.
 <li> Download and compile the Kent Libraries
 
 <ol>
-<li> Download the samtabix code for interfacing with sam/bam files<br />
-
-<ol>
-<li> Go to the directory where you would like this code repository to be located<br />
-<li> git clone http://genome-source.cse.ucsc.edu/samtabix.git samtabix<br />
-<li> cd samtabix<br />
-<li> make<br />
-</ol>
-
 <li> Set environment variables
 
 <ol>
@@ -46,15 +37,6 @@ If it is not, set your machtype variable.
 If you are not sure what your MACHTYPE variable should be, you can try typing "uname -m", "uname -p", or "uname -a"
 for some hints and pick the element from the previous list that most closely matches the output.  For most people
 it will be "x86_64".
-<li> set USE_SAMTABIX to 1
-<li> set SAMTABIXDIR to locationOfRepoYouJustDownloaded
-<li> I use c-shell, so for me I add the following lines to my .cshrc (I also active USE_SSL, while compiling which may not be
-needed for many people, but probably will not hurt):<br />
-setenv MACHTYPE x86_64<br />
-setenv USE_SSL 1<br />
-setenv USE_SAMTABIX 1<br />
-setenv SAMTABIXDIR /home/lowec/samtabix<br />
-If you like to use bash, setting a variable in your .bashrc will look more like "export USE_XXX=1"
 </ol>
 
 <li> Go to a folder on your computer where you want the kent source tree to reside and type:<br />

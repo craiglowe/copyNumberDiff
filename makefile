@@ -1,20 +1,22 @@
 
 L=-pthread
-HG_DEFS=-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_GNU_SOURCE -DMACHTYPE_${MACHTYPE}
+HG_DEFS=-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_GNU_SOURCE -DMACHTYPE_${MACHTYPE} -DUSE_HIC
 
 ##########
 #
 # EDIT the lines below so that they point to your kent source
 # and gsl header files and libraries 
 #
-HG_INC += -I/home/lowec/kent/src/hg/inc -I/home/lowec/kent/src/inc
-L += /home/lowec/kent/src/lib/${MACHTYPE}/jkweb.a
+HG_INC += -I/home/cl454/src/kent/src/hg/inc -I/home/cl454/src/kent/src/inc -I/home/cl454/src/kent/src/htslib
+L += /home/cl454/src/kent/src/lib/${MACHTYPE}/jkweb.a /home/cl454/src/kent/src/htslib/libhts.a
 
-HG_INC += -I/home/lowec/src/gsl/gsl-1.16_install/include
-L += /home/lowec/src/gsl/gsl-1.16_install/lib/libgsl.a /home/lowec/src/gsl/gsl-1.16_install/lib/libgslcblas.a
+HG_INC += -I/home/cl454/src/gsl/gsl-2.6_install/include
+L += /home/cl454/src/gsl/gsl-2.6_install/lib/libgsl.a /home/cl454/src/gsl/gsl-2.6_install/lib/libgslcblas.a
 
-HG_INC += -I/home/lowec/src/R/R-3.1.2/include
-L += /home/lowec/src/R/R-3.1.2/src/nmath/standalone/libRmath.a
+HG_INC += -I/home/cl454/src/R/R-3.6.3/src/include
+L += /home/cl454/src/R/R-3.6.3/src/nmath/standalone/libRmath.a
+
+L += /usr/lib/x86_64-linux-gnu/libssl.a
 
 #
 # END of basic editing
@@ -43,19 +45,6 @@ endif
 # End of sam/bam and tabix
 #
 ##########
-
-##########
-#
-# If you compiled your kent source with SSL support
-# then you will need to use these lines
-#
-ifeq (${USE_SSL},1)
-	L+=-lssl -lcrypto
-	HG_DEFS+=-DUSE_SSL
-endif
-#
-###########
-
 
 CC=gcc
 ifeq (${COPT},)
@@ -91,7 +80,7 @@ CFLAGS += ${HG_WARN}
 %.o: %.c
 	${CC} ${COPT} ${CFLAGS} ${HG_DEFS} ${HG_WARN} ${HG_INC} ${XINC} -o $@ -c $<
 
-L += -lm -lz
+L += -lcrypto -lm -lz
 
 all: copyNumberDiff countKmers countKmersWithTree faToGcStats fastqTrim bamToGcStats
 

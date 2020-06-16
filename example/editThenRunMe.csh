@@ -1,14 +1,15 @@
 #!/bin/csh -ef
 
 # edit the below lines to point to the programs on your system
-set evolveGenome = "/home/lowec/code/cTools/evolveGenome/evolveGenome"
-set countKmers = "/home/lowec/code/cTools/copyNumberDiff/countKmers"
-set faToGcStats = "/home/lowec/code/cTools/copyNumberDiff/faToGcStats"
-set copyNumberDiff = "/home/lowec/code/cTools/copyNumberDiff/copyNumberDiff"
-set wgHmm = "/home/lowec/code/cTools/wgHmm/wgHmm"
-set art = "/home/lowec/src/art/art_bin_VanillaIceCream/art_illumina"
-set bwa = "/home/lowec/src/bwa/bwa-0.7.12/bwa"
-set samtools = "/home/lowec/src/samtools/samtools-1.3.1/samtools"
+set evolveGenome = "/home/cl454/src/useKent/evolveGenome/evolveGenome"
+set countKmers = "/home/cl454/src/useKent/copyNumberDiff/countKmers"
+set faToGcStats = "/home/cl454/src/useKent/copyNumberDiff/faToGcStats"
+set copyNumberDiff = "/home/cl454/src/useKent/copyNumberDiff/copyNumberDiff"
+set wgHmm = "/home/cl454/src/useKent/wgHmm/wgHmm"
+set art = "/home/cl454/src/art_src_MountRainier_Linux/art_illumina"
+set bwa = "/home/cl454/src/bwa-0.7.17/bwa"
+set samtools = "/home/cl454/src/samtools-1.10/samtools"
+set overlapSelect = "/home/cl454/bin/x86_64/overlapSelect"
 
 # these files should already be in the folder.  They are one
 # chromosome from the stickleback assembly
@@ -92,9 +93,9 @@ foreach mut (del dup)
 	cat output.$mut.bed | perl -ne 'chomp($_);@w=split("\t",$_);if(($w[3] ne "0")&&($w[3] ne "4")&&($w[3] ne "8")){print("$_\n");}' > output.$mut.calls.bed
 end
 
-set delNumer = `overlapSelect output.del.calls.bed deletionLocations.bed stdout | wc -l`
+set delNumer = `$overlapSelect output.del.calls.bed deletionLocations.bed stdout | wc -l`
 set delDenom = `cat deletionLocations.bed | wc -l`
-set dupNumer = `overlapSelect output.dup.calls.bed duplicationLocations.bed stdout | wc -l`
+set dupNumer = `$overlapSelect output.dup.calls.bed duplicationLocations.bed stdout | wc -l`
 set dupDenom = `cat duplicationLocations.bed | wc -l`
 
 echo "The program found $delNumer of $delDenom deletions and $dupNumer of $dupDenom duplications"

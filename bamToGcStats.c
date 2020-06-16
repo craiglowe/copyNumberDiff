@@ -11,7 +11,7 @@ Written by Craig Lowe
 #include "hash.h"
 #include "sqlNum.h"
 #include "linefile.h"
-#include "sam.h"
+#include "htslib/sam.h"
 #include "bamFile.h"
 
 /*---------------------------------------------------------------------------*/
@@ -43,8 +43,13 @@ errAbort(
 
 double addReadCounts(char *filename, double *bins, uint32_t readLength)
 {
-	samfile_t *samFp = NULL;
-	samFp = samopen(filename, "rb", 0);
+	//samfile_t *samFp = NULL;
+	samfile_t *samFp = bamMustOpenLocal(filename, "rb", NULL);
+	bam_header_t *head = sam_hdr_read(samFp);
+	if (head == NULL) {
+		errAbort("Aborting ... bad BAM header in %s", filename);
+	}
+	//samFp = samopen(filename, "rb", 0);
 	bam1_t* b = bam_init1();
 	bam1_core_t *c = NULL;
 	unsigned int i = 0;
@@ -53,7 +58,7 @@ double addReadCounts(char *filename, double *bins, uint32_t readLength)
 	double used = 0, tooShort = 0, badMapping = 0, hadN = 0;
 	uint8_t *seq = NULL;
 
-	while(samread(samFp, b) >= 0)
+	while(sam_read1(samFp, head, b) >= 0)
 	{
 		c = &b->core;
 		if((c->qual >= optMinQual) && (!(c->flag&(BAM_FSECONDARY|BAM_FQCFAIL|BAM_FDUP|BAM_FUNMAP))))

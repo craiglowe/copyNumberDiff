@@ -479,7 +479,7 @@ void printKmerCount(struct hash *kmers)
 	while ((hel = hashNext(&cookie)) != NULL)
 	{
 		count = hel->val;
-		//uglyf("%s %u\n", hel->name, *count);
+		uglyf("%s %u\n", hel->name, *count);
 	}
 }
 

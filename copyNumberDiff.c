@@ -15,7 +15,7 @@ Written by Craig Lowe
 #include "bed.h"
 #include "gsl/gsl_randist.h"
 #include "gsl/gsl_cdf.h"
-#include "sam.h"
+#include "htslib/sam.h"
 #include "bamFile.h"
 #define MATHLIB_STANDALONE
 #include "Rmath.h"
@@ -378,8 +378,13 @@ struct hash *initDataStructure(struct slChrom *chromList, unsigned int numberOfS
 
 double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber, double gcPseudoCounts, double **readGcBins, double *genomicGcBins, unsigned int kmerLength)
 {
-	samfile_t *samFp = NULL;
-	samFp = samopen(filename, "rb", 0);
+	//samfile_t *samFp = NULL;
+	samfile_t *samFp = bamMustOpenLocal(filename, "rb", NULL);
+	bam_header_t *head = sam_hdr_read(samFp);
+	if (head == NULL) {
+		errAbort("Aborting ... bad BAM header in %s", filename);
+	}
+	//samFp = samopen(filename, "rb", 0);
 	bam1_t* b = bam_init1();
 	bam1_core_t *c = NULL;
 	char *chrom = NULL;
@@ -395,7 +400,7 @@ double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber
 	uint32_t base = 0;
 	char secondTryChrom[1024];
 
-	while(samread(samFp, b) >= 0)
+	while(sam_read1(samFp, head, b) >= 0)
 	{
 		c = &b->core;
 		//added a check that read is at least kmerLength in length.  Longer reads will be trimmed
@@ -408,7 +413,7 @@ double addReadCounts(struct hash *coverageHash, char *filename, int sampleNumber
 			if(c->tid != chromId)
 			{
 				chromId = c->tid;
-				chrom = samFp->header->target_name[chromId];
+				chrom = head->target_name[chromId];
 				sprintf(secondTryChrom, "chr%s", chrom);
 				verbose(3, "Looking for coverage data structure for %s or %s\n", chrom, secondTryChrom);
 				if(optChrom == NULL || sameString(optChrom, chrom) || sameString(optChrom, secondTryChrom))
@@ -587,12 +592,12 @@ void printIntermediateData(unsigned int numSamplesOne, unsigned int numSamplesTw
 	unsigned int basePos = 0;
 	unsigned int **coverage = NULL;
 	double probBinom = 0, densityBinom = 0, meanNegBinom = 0, sizeNegBinom = 0, densityNegBinom = 0, probDynamicBinom = 0, densityDynamicBinom = 0;
-	unsigned int numSamples = 0, sampleNumber = 0, copyNumber = 0;
-	unsigned int *kmerMisMaps = NULL, *gcData = NULL;
+	unsigned int sampleNumber = 0, copyNumber = 0; //numSamples=0
+	unsigned int *kmerMisMaps = NULL;//, *gcData = NULL;
 
 	verbose(3, " Allocating memory\n");
 
-	numSamples = numSamplesOne + numSamplesTwo;
+	//numSamples = numSamplesOne + numSamplesTwo;
 
 	FILE *fout = mustOpen(outFilename, "w");
 
@@ -622,7 +627,7 @@ void printIntermediateData(unsigned int numSamplesOne, unsigned int numSamplesTw
 		headBed = hel->val;
 		coverage = hashMustFindVal(coverageHash, headBed->chrom);
 		kmerMisMaps = hashMustFindVal(kmerMisMapsHash, headBed->chrom);
-		gcData = hashMustFindVal(gcContentHash, headBed->chrom);
+		//gcData = hashMustFindVal(gcContentHash, headBed->chrom);
 		for(bunk = headBed; bunk != NULL; bunk=bunk->next)
 		{
 			verbose(3, " Working on %s:%u-%u\n", bunk->chrom, bunk->chromStart, bunk->chromEnd);
@@ -671,7 +676,7 @@ void printProbabilities(unsigned int numSamplesOne, unsigned int numSamplesTwo, 
 	unsigned int **coverage = NULL;
 	double **currProbs = NULL;
 	double *currProbsOne = NULL, *currProbsTwo = NULL;
-	unsigned int numSamples = 0, i = 0, j = 0;
+	unsigned int i = 0, j = 0;//numSamples=0
 	unsigned int *kmerMisMaps = NULL, *gcData = NULL;
 
 	verbose(3, " Allocating memory\n");
@@ -683,7 +688,7 @@ void printProbabilities(unsigned int numSamplesOne, unsigned int numSamplesTwo, 
 		AllocArray(currProbs[i], maxCopy+1);
 	}
 
-	numSamples = numSamplesOne + numSamplesTwo;
+	//numSamples = numSamplesOne + numSamplesTwo;
 
 	FILE *fout = mustOpen(outFilename, "w");
 
