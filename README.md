@@ -46,6 +46,8 @@ to download the repository onto your own computer.
 cd kent/src<br />
 <li> Compile the libraries<br />
 make libs
+<li> cd kent/src/jkOwnLib and type make.
+<li> cd kent/src/htslib and type make.
 <li> If this was successful, you should have a file here:<br />
 kent/src/lib/x86_64/jkweb.a<br />
 the x86_64 will be the machtype of your machine.</br />
